@@ -5,8 +5,8 @@ import { CommandRequest, CommandResponse } from '@llm-switchbot/shared';
 const switchbotRoutes: FastifyPluginAsync = async function (fastify) {
   // SwitchBotクライアントを初期化
   const getSwitchBotClient = () => {
-    const token = fastify.config.SWITCHBOT_TOKEN;
-    const secret = fastify.config.SWITCHBOT_SECRET;
+    const token = process.env.SWITCHBOT_TOKEN || 'demo-token';
+    const secret = process.env.SWITCHBOT_SECRET || 'demo-secret';
     
     if (!token || !secret) {
       throw new Error('SwitchBot credentials not configured');
@@ -60,7 +60,7 @@ const switchbotRoutes: FastifyPluginAsync = async function (fastify) {
   // デバイスコマンド送信
   fastify.post<{ Body: CommandRequest }>('/command', async (request, reply) => {
     try {
-      const { deviceId, command, parameter, commandType } = request.body;
+      const { deviceId, command, parameter, commandType } = request.body as CommandRequest;
       
       if (!deviceId || !command) {
         reply.code(400).send({
