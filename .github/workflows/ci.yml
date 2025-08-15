@@ -38,13 +38,16 @@ jobs:
         pnpm --filter api lint
         pnpm --filter web lint
 
+    - name: Build workspace libraries (for type declarations)
+      run: |
+        pnpm --filter switchbot-adapter build
+        pnpm --filter harmony-tools build
+        pnpm --filter shared build
+
     - name: Type check
       run: |
         pnpm --filter api typecheck
         pnpm --filter web typecheck
-        pnpm --filter switchbot-adapter tsc --noEmit
-        pnpm --filter shared tsc --noEmit
-        pnpm --filter harmony-tools tsc --noEmit
 
     - name: Run tests
       run: |
