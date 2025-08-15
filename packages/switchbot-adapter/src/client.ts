@@ -59,7 +59,7 @@ export class SwitchBotClient {
         throw new Error(errorMessage);
       }
 
-      return response.json();
+      return response.json() as Promise<T>;
     };
 
     // キャッシュ対応GET要求
