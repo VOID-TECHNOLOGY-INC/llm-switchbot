@@ -45,7 +45,7 @@ const webhooksRoutes: FastifyPluginAsync = async function (fastify) {
       
       if (!webhookSecret) {
         fastify.log.error('SWITCHBOT_WEBHOOK_SECRET not configured');
-        return reply.code(500).send(createWebhookResponse('Server configuration error', 500));
+        return reply.code(500).send(createWebhookResponse(500, 'Server configuration error'));
       }
       
       // Webhook署名検証（本番環境では必須）
@@ -60,24 +60,24 @@ const webhooksRoutes: FastifyPluginAsync = async function (fastify) {
         
         if (!isValidSignature) {
           fastify.log.warn('Invalid webhook signature received');
-          return reply.code(401).send(createWebhookResponse('Invalid signature', 401));
+          return reply.code(401).send(createWebhookResponse(401, 'Invalid signature'));
         }
       } else {
         fastify.log.warn('Webhook received without signature headers (development mode?)');
       }
       
-      // イベントデータのパース
-      const webhookEvent = parseWebhookEvent(rawPayload);
+            // イベントデータのパース
+      const webhookEvent = parseWebhookEvent(request.body);
       if (!webhookEvent) {
         fastify.log.error('Failed to parse webhook payload');
-        return reply.code(400).send(createWebhookResponse('Invalid payload format', 400));
+        return reply.code(400).send(createWebhookResponse(400, 'Invalid payload format'));
       }
-      
+
       // イベントのログ記録
       fastify.log.info({
         eventType: webhookEvent.eventType,
-        deviceType: webhookEvent.context?.deviceType,
-        deviceMac: webhookEvent.context?.deviceMac,
+        deviceType: webhookEvent.deviceType,
+        deviceMac: webhookEvent.deviceMac,
         timestamp: new Date().toISOString()
       }, 'Received SwitchBot webhook event');
       
@@ -86,11 +86,11 @@ const webhooksRoutes: FastifyPluginAsync = async function (fastify) {
       // TODO: 自動化ルールの評価（条件マッチング → アクション実行）
       
       // 成功レスポンス
-      return createWebhookResponse('Webhook processed successfully');
+      return createWebhookResponse(200, 'Webhook processed successfully');
       
     } catch (error) {
       fastify.log.error(error, 'Failed to process SwitchBot webhook');
-      return reply.code(500).send(createWebhookResponse('Failed to process webhook', 500));
+      return reply.code(500).send(createWebhookResponse(500, 'Failed to process webhook'));
     }
   });
   

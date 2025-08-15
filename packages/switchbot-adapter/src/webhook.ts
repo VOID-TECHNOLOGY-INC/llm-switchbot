@@ -51,7 +51,7 @@ export function verifyWebhookSignature(
  * @param message レスポンスメッセージ
  * @returns 標準化されたWebhook応答
  */
-export function createWebhookResponse(statusCode: number, message: string) {
+export function createWebhookResponse(statusCode: number, message: string = 'OK') {
   return {
     statusCode,
     message,
