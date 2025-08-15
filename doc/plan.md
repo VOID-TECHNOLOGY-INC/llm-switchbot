@@ -221,6 +221,14 @@ POST /api/webhooks/switchbot
 - Webhook 遅延: 可能な限りローカル近接配置、UI 側の到着待ち表示
 - 120B 推論コスト/可用性: 20B をデフォルトにし、性能要所のみ 120B に差し替え
 
+#### 未対応事項・技術債務
+
+- **ESLint設定の完全修正**: API アプリのESLint TypeScript設定が一時的にスキップ状態
+  - 現状: `lint: "echo 'Linting skipped for now' && exit 0"`
+  - 対策: TypeScript ESLintプラグインの依存関係修正、`.eslintrc.json`の完全設定
+  - 影響: CI通過は可能だが、コード品質チェックが不完全
+  - 優先度: Day 4以降での対応予定
+
 ### 16. 開発環境/セットアップ
 
 - 前提
