@@ -35,7 +35,7 @@ export function verifyWebhookSignature(
   }
 
   // 署名生成（SwitchBot Webhook仕様に基づく）
-  const stringToSign = payload + timestamp + nonce;
+  const stringToSign = secret + nonce + timestamp + payload;
   const hmac = createHmac('sha256', secret);
   hmac.update(stringToSign, 'utf8');
   const expectedSignature = hmac.digest('base64');

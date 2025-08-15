@@ -86,7 +86,7 @@ const webhooksRoutes: FastifyPluginAsync = async function (fastify) {
       // TODO: 自動化ルールの評価（条件マッチング → アクション実行）
       
       // 成功レスポンス
-      return createWebhookResponse(200, 'Webhook processed successfully');
+      return { statusCode: 100, message: 'Webhook processed successfully' };
       
     } catch (error) {
       fastify.log.error(error, 'Failed to process SwitchBot webhook');

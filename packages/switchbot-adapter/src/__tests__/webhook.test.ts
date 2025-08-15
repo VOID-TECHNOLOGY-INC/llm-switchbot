@@ -93,9 +93,9 @@ describe('SwitchBot Webhook Verification', () => {
 
 // テスト用のヘルパー関数
 function generateTestSignature(payload: string, timestamp: string, nonce: string, secret: string): string {
-  // SwitchBot Webhook署名の実装に合わせる（実装後に更新）
+  // SwitchBot Webhook署名の実装に合わせる
   const crypto = require('crypto');
-  const stringToSign = payload + timestamp + nonce;
+  const stringToSign = secret + nonce + timestamp + payload;
   const hmac = crypto.createHmac('sha256', secret);
   hmac.update(stringToSign, 'utf8');
   return hmac.digest('base64');

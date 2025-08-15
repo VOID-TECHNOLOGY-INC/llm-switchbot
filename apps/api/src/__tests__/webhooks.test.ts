@@ -21,10 +21,10 @@ describe('SwitchBot Webhooks', () => {
   });
 
   // Helper function to generate webhook signature for testing
-  function generateWebhookSignature(payload: string, timestamp: string, nonce: string, secret: string): string {
+  const generateTestSignature = (payload: string, timestamp: string, nonce: string, secret: string): string => {
     const stringToSign = secret + nonce + timestamp + payload;
     return crypto.createHmac('sha256', secret).update(stringToSign).digest('base64');
-  }
+  };
 
   describe('POST /api/webhooks/switchbot', () => {
     const mockWebhookEvent = {
@@ -43,7 +43,7 @@ describe('SwitchBot Webhooks', () => {
       const payload = JSON.stringify(mockWebhookEvent);
       const timestamp = Date.now().toString();
       const nonce = 'test-nonce-123';
-      const signature = generateWebhookSignature(payload, timestamp, nonce, 'test-webhook-secret');
+      const signature = generateTestSignature(payload, timestamp, nonce, 'test-webhook-secret');
 
       const response = await app.inject({
         method: 'POST',
@@ -106,7 +106,7 @@ describe('SwitchBot Webhooks', () => {
       const payload = JSON.stringify(mockWebhookEvent);
       const expiredTimestamp = (Date.now() - 600000).toString(); // 10 minutes ago
       const nonce = 'test-nonce-123';
-      const signature = generateWebhookSignature(payload, expiredTimestamp, nonce, 'test-webhook-secret');
+      const signature = generateTestSignature(payload, expiredTimestamp, nonce, 'test-webhook-secret');
 
       const response = await app.inject({
         method: 'POST',
