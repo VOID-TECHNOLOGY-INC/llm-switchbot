@@ -1,32 +1,89 @@
 import { FastifyPluginAsync } from 'fastify';
-import { ChatRequest, ChatResponse } from '@llm-switchbot/shared';
+import { SwitchBotClient } from '@llm-switchbot/switchbot-adapter';
+import { ChatOrchestrator } from '../orchestrator/chat-orchestrator';
+
+interface ChatRequestBody {
+  messages: Array<{
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+  }>;
+  enableTools?: boolean;
+}
 
 const chatRoutes: FastifyPluginAsync = async function (fastify) {
-  // チャットエンドポイント（後でLLM連携を実装）
-  fastify.post<{ Body: ChatRequest }>('/chat', async (request, reply) => {
+  // Chat Orchestrator インスタンスの初期化
+  const switchBotClient = new SwitchBotClient(
+    process.env.SWITCHBOT_TOKEN || 'demo-token',
+    process.env.SWITCHBOT_SECRET || 'demo-secret'
+  );
+  const orchestrator = new ChatOrchestrator(switchBotClient);
+
+  // POST /chat - チャット処理
+  fastify.post<{ Body: ChatRequestBody }>('/chat', async (request, reply) => {
     try {
-      const { messages, toolsAllowed } = request.body;
-      
+      const { messages, enableTools = false } = request.body;
+
       if (!messages || !Array.isArray(messages)) {
-        reply.code(400).send({
-          statusCode: 400,
-          message: 'messages array is required'
+        return reply.code(400).send({
+          error: 'Invalid request: messages array is required'
         });
-        return;
       }
-      
-      // TODO: LLM との統合を実装
-      const response: ChatResponse = {
-        reply: 'Chat integration not yet implemented',
-        toolCalls: []
+
+      // チャット処理を実行
+      const result = await orchestrator.processChat(messages, enableTools);
+
+      return {
+        response: result.response,
+        toolResults: result.toolResults,
+        toolsAvailable: enableTools,
+        timestamp: new Date().toISOString()
       };
-      
-      return response;
+
     } catch (error) {
-      fastify.log.error(error, 'Failed to process chat');
-      reply.code(500).send({
-        statusCode: 500,
-        message: 'Failed to process chat'
+      fastify.log.error(error, 'Chat processing error');
+      
+      return reply.code(500).send({
+        error: 'Internal server error during chat processing',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // GET /tools - 利用可能なツール一覧
+  fastify.get('/tools', async (request, reply) => {
+    const toolsSchema = orchestrator.getToolsSchema();
+    
+    return {
+      tools: toolsSchema.tools.map(tool => ({
+        name: tool.function.name,
+        description: tool.function.description,
+        parameters: tool.function.parameters
+      })),
+      count: toolsSchema.tools.length
+    };
+  });
+
+  // POST /tool - 単一ツール実行（デバッグ用）
+  fastify.post('/tool', async (request, reply) => {
+    try {
+      const toolCall = request.body as any;
+
+      if (!toolCall || !toolCall.function || !toolCall.function.name) {
+        return reply.code(400).send({
+          error: 'Invalid tool call format'
+        });
+      }
+
+      const result = await orchestrator.processToolCall(toolCall);
+      
+      return result;
+
+    } catch (error) {
+      fastify.log.error(error, 'Tool execution error');
+      
+      return reply.code(500).send({
+        error: 'Internal server error during tool execution',
+        message: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
