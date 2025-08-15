@@ -5,10 +5,9 @@ import { Device } from '@llm-switchbot/shared'
 import { 
   PowerIcon, 
   BoltIcon,
-  ThermometerIcon,
   BeakerIcon,
   SunIcon,
-  BatteryIcon,
+  Battery50Icon,
   WifiIcon,
   ClockIcon
 } from '@heroicons/react/24/outline'
@@ -55,7 +54,7 @@ export function DeviceCard({ device, onCommand, isLoading = false, loadingComman
       <div className="grid grid-cols-2 gap-2 text-xs">
         {lastStatus.temperature !== undefined && (
           <div className="flex items-center gap-1 text-blue-600">
-            <ThermometerIcon className="w-3 h-3" />
+            <BeakerIcon className="w-3 h-3" />
             <span>{lastStatus.temperature}°C</span>
           </div>
         )}
@@ -202,7 +201,7 @@ export function DeviceCard({ device, onCommand, isLoading = false, loadingComman
         {/* バッテリー情報 */}
         {lastStatus?.battery !== undefined && (
           <div className="flex items-center gap-1 text-xs text-gray-600">
-            <BatteryIcon className="w-3 h-3" />
+            <Battery50Icon className="w-3 h-3" />
             <span>バッテリー: {lastStatus.battery}%</span>
           </div>
         )}
