@@ -67,7 +67,7 @@ describe('DeviceCard', () => {
     fireEvent.click(onButton)
     
     await waitFor(() => {
-      expect(mockOnCommand).toHaveBeenCalledWith(mockDevice.id, 'turnOn')
+      expect(mockOnCommand).toHaveBeenCalledWith(mockDevice.id, 'turnOn', undefined)
     })
   })
 
