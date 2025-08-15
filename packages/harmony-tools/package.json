@@ -1,0 +1,18 @@
+{
+  "name": "@llm-switchbot/harmony-tools",
+  "version": "0.1.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'No linting for tools package'"
+  },
+  "dependencies": {
+    "@llm-switchbot/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
