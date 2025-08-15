@@ -103,4 +103,51 @@ export class SwitchBotClient {
 
     return response.json();
   }
+
+  /**
+   * シーン一覧を取得
+   * @returns シーン一覧のレスポンス
+   */
+  async getScenes(): Promise<any> {
+    const url = `${this.baseUrl}/scenes`;
+    const headers = createAuthHeaders(this.token, this.secret);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})) as any;
+      throw new Error(`SwitchBot API Error: ${response.status} - ${errorData.message || 'Unknown error'}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * シーンを実行
+   * @param sceneId シーンID
+   * @returns シーン実行結果
+   */
+  async executeScene(sceneId: string): Promise<any> {
+    if (!sceneId || sceneId.trim() === '') {
+      throw new Error('Scene ID is required');
+    }
+
+    const url = `${this.baseUrl}/scenes/${sceneId}/execute`;
+    const headers = createAuthHeaders(this.token, this.secret);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})) as any;
+      throw new Error(`SwitchBot API Error: ${response.status} - ${errorData.message || 'Unknown error'}`);
+    }
+
+    return response.json();
+  }
 }
