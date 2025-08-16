@@ -5,6 +5,15 @@ describe('E2E Integration Tests', () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {
+    // CI環境での環境変数を設定
+    process.env.SWITCHBOT_TOKEN = 'test-token';
+    process.env.SWITCHBOT_SECRET = 'test-secret';
+    process.env.SWITCHBOT_WEBHOOK_SECRET = 'test-webhook-secret';
+    process.env.SWITCHBOT_WEBHOOK_VERIFY_TOKEN = 'test-verify-token';
+    // LLMを無効化（テスト環境では不要）
+    process.env.LLM_PROVIDER = '';
+    process.env.OPENAI_API_KEY = '';
+    
     app = await build({ logger: false });
     await app.ready();
   });
@@ -13,6 +22,14 @@ describe('E2E Integration Tests', () => {
     if (app) {
       await app.close();
     }
+    
+    // 環境変数をクリーンアップ
+    delete process.env.SWITCHBOT_TOKEN;
+    delete process.env.SWITCHBOT_SECRET;
+    delete process.env.SWITCHBOT_WEBHOOK_SECRET;
+    delete process.env.SWITCHBOT_WEBHOOK_VERIFY_TOKEN;
+    delete process.env.LLM_PROVIDER;
+    delete process.env.OPENAI_API_KEY;
   });
 
   describe('Chat API Integration', () => {
@@ -33,7 +50,7 @@ describe('E2E Integration Tests', () => {
       const data = response.json();
       expect(data.response).toBeDefined();
       expect(data.response.role).toBe('assistant');
-      expect(data.response.content).toContain('こんにちは');
+      expect(data.response.content).toContain('デモモード');
       expect(data.toolResults).toHaveLength(0);
       expect(data.toolsAvailable).toBe(false);
     });

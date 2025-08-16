@@ -10,6 +10,8 @@ coverage/
 # macOS
 .DS_Store
 ._*
+**/*._*
+**/*.DS_Store
 
 # IDE
 .vscode/
