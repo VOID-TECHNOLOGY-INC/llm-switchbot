@@ -162,11 +162,34 @@ export class ChatOrchestrator {
     // LLMアダプターが利用可能な場合は実際のLLMを使用
     if (this.llmAdapter) {
       try {
+        // システムメッセージを追加してデバイス情報を提供
+        const systemMessage = {
+          role: 'system' as const,
+          content: `あなたはスマートホーム制御アシスタントです。以下のデバイスが利用可能です：
+
+**利用可能なデバイス:**
+- ハブミニ (ID: E1750C44657C) - Hub Mini
+- 温湿度計 (ID: F66854E650BE) - MeterPlus - 温度・湿度測定
+- アップル (ID: 02-202208281754-46662932) - TVリモート (操作禁止)
+- エアコン (ID: 02-202212241621-96856893) - エアコンリモート (操作禁止)
+
+**重要な指示:**
+1. エアコンとテレビ（アップル）の操作は絶対に行わないでください
+2. 温湿度計のデバッグのみ実行してください
+3. デバイスIDがわかっている場合、get_devicesを呼ぶ必要はありません
+4. 温湿度計の状態確認は get_device_status (deviceId: F66854E650BE) を使用
+5. 明確にデバイス操作を求められた場合のみツールを使用してください
+6. ツール実行後は、取得した結果を分かりやすく自然言語で説明してください
+7. 温湿度計の結果では、温度・湿度・バッテリー状態と快適度を説明してください`
+        };
+
+        const messagesWithSystem = [systemMessage, ...messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))];
+
         const llmRequest: LLMRequest = {
-          messages: messages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })),
+          messages: messagesWithSystem,
           tools: enableTools ? harmonyToolsSchema.tools : undefined,
           temperature: 0.7,
           max_tokens: 1000
@@ -332,5 +355,9 @@ export class ChatOrchestrator {
    */
   getAutomationService(): AutomationProposalService {
     return this.automationService;
+  }
+
+  getLLMAdapter(): LLMAdapter | null {
+    return this.llmAdapter;
   }
 }

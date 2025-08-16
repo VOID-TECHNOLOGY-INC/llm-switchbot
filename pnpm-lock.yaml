@@ -45,7 +45,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/switchbot-adapter
       dotenv:
-        specifier: ^16.0.0
+        specifier: ^16.6.1
         version: 16.6.1
       fastify:
         specifier: ^4.0.0
