@@ -40,6 +40,8 @@ jobs:
       run: |
         pnpm --filter api lint
         pnpm --filter web lint
+        pnpm --filter switchbot-adapter lint
+        pnpm --filter harmony-tools lint
 
     - name: Build workspace libraries (for type declarations)
       run: |
