@@ -113,6 +113,7 @@ export async function build(opts = {}) {
   fastify.register(require('./routes/switchbot'), { prefix: '/api/switchbot' });
   fastify.register(require('./routes/chat'), { prefix: '/api' });
   fastify.register(require('./routes/webhooks'), { prefix: '/api/webhooks' });
+  fastify.register(require('./routes/automation'), { prefix: '/api' });
 
   // Wait for environment variables to be loaded
   await fastify.ready();

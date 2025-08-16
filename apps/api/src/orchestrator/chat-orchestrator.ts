@@ -10,6 +10,8 @@ import {
   LLMAdapter,
   LLMRequest
 } from '@llm-switchbot/harmony-tools';
+import { AutomationProposalService } from '../services/automation-proposal';
+import { SceneLearningService } from '../services/scene-learning';
 
 export interface ToolCall {
   id: string;
@@ -43,10 +45,14 @@ export interface ChatProcessResult {
 export class ChatOrchestrator {
   private switchBotClient: SwitchBotClient;
   private llmAdapter: LLMAdapter | null = null;
+  private automationService: AutomationProposalService;
+  private sceneLearningService: SceneLearningService;
 
   constructor(switchBotClient: SwitchBotClient, llmAdapter?: LLMAdapter) {
     this.switchBotClient = switchBotClient;
     this.llmAdapter = llmAdapter || null;
+    this.automationService = new AutomationProposalService(switchBotClient);
+    this.sceneLearningService = new SceneLearningService(switchBotClient);
   }
 
   /**
@@ -305,5 +311,26 @@ export class ChatOrchestrator {
     }
 
     return `${lastResult.tool_name}を実行しました。ステータス: ${lastResult.status}`;
+  }
+
+  /**
+   * 自動化提案を取得
+   */
+  async getAutomationProposal(context: any): Promise<any> {
+    return await this.automationService.generateProposal(context);
+  }
+
+  /**
+   * シーン学習サービスを取得
+   */
+  getSceneLearningService(): SceneLearningService {
+    return this.sceneLearningService;
+  }
+
+  /**
+   * 自動化提案サービスを取得
+   */
+  getAutomationService(): AutomationProposalService {
+    return this.automationService;
   }
 }
