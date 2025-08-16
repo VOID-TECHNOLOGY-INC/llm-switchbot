@@ -33,10 +33,15 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
 
+    - name: Clean macOS hidden files
+      run: find . -type f -name "._*" -delete || true
+
     - name: Lint code
       run: |
         pnpm --filter api lint
         pnpm --filter web lint
+        pnpm --filter switchbot-adapter lint
+        pnpm --filter harmony-tools lint
 
     - name: Build workspace libraries (for type declarations)
       run: |

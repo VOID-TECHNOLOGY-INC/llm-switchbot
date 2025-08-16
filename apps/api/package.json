@@ -16,7 +16,7 @@
     "@llm-switchbot/harmony-tools": "workspace:*",
     "@llm-switchbot/shared": "workspace:*",
     "@llm-switchbot/switchbot-adapter": "workspace:*",
-    "dotenv": "^16.0.0",
+    "dotenv": "^16.6.1",
     "fastify": "^4.0.0",
     "pino": "^8.0.0"
   },

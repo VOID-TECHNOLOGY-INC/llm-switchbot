@@ -4,6 +4,10 @@ import { ChatOrchestrator } from './orchestrator/chat-orchestrator';
 import cors from '@fastify/cors';
 import env from '@fastify/env';
 import { LLMFactory } from '@llm-switchbot/harmony-tools';
+import * as dotenv from 'dotenv';
+
+// 環境変数を直接読み込み（プロジェクトルートから）
+dotenv.config({ path: '../../.env' });
 
 // Extend FastifyInstance with our services
 declare module 'fastify' {
@@ -62,7 +66,7 @@ export async function build(opts = {}) {
 
   fastify.register(env, {
     schema: envSchema,
-    dotenv: false // CI環境でのdotenv問題を回避
+    dotenv: true // 環境変数ファイルを読み込む
   });
 
     // Health check route
@@ -113,6 +117,8 @@ export async function build(opts = {}) {
   fastify.register(require('./routes/switchbot'), { prefix: '/api/switchbot' });
   fastify.register(require('./routes/chat'), { prefix: '/api' });
   fastify.register(require('./routes/webhooks'), { prefix: '/api/webhooks' });
+  fastify.register(require('./routes/automation'), { prefix: '/api' });
+  fastify.register(require('./routes/debug'), { prefix: '/api' });
 
   // Wait for environment variables to be loaded
   await fastify.ready();
