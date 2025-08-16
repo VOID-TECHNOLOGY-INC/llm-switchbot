@@ -253,7 +253,7 @@ export class SceneLearningService {
     const groups: Record<string, OperationRecord[]> = {};
 
     for (const operation of this.operationHistory) {
-      const hour = new Date(operation.timestamp).getHours();
+      const hour = new Date(operation.timestamp).getUTCHours();
       const timeRange = this.getTimeRange(hour);
       
       if (!groups[timeRange]) {

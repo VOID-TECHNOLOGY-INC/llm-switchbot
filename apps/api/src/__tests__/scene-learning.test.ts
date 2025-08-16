@@ -137,8 +137,8 @@ describe('SceneLearningService', () => {
 
       const patterns = await sceneLearningService.detectTimeBasedPatterns();
       expect(patterns).toHaveLength(1);
-      expect(patterns[0].timeRange.start).toBe('00:00');
-      expect(patterns[0].timeRange.end).toBe('06:00');
+      expect(patterns[0].timeRange.start).toBe('18:00');
+      expect(patterns[0].timeRange.end).toBe('24:00');
       expect(patterns[0].frequency).toBeGreaterThanOrEqual(5);
     });
   });
