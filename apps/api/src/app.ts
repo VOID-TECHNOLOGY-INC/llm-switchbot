@@ -62,10 +62,10 @@ export async function build(opts = {}) {
 
   fastify.register(env, {
     schema: envSchema,
-    dotenv: true
+    dotenv: false // CI環境でのdotenv問題を回避
   });
 
-  // Health check route
+    // Health check route
   fastify.get('/health', async () => {
     return {
       status: 'ok',
@@ -73,28 +73,26 @@ export async function build(opts = {}) {
     };
   });
 
-    // Initialize services after env is loaded
-  await fastify.ready();
-  
+  // Initialize services (before ready)
   const switchBotClient = new SwitchBotClient(
-    fastify.config.SWITCHBOT_TOKEN,
-    fastify.config.SWITCHBOT_SECRET
+    process.env.SWITCHBOT_TOKEN || 'demo-token',
+    process.env.SWITCHBOT_SECRET || 'demo-secret'
   );
 
   // Initialize LLM adapter
   let llmAdapter = null;
   try {
-    if (fastify.config.LLM_PROVIDER === 'openai' && fastify.config.OPENAI_API_KEY) {
+    if (process.env.LLM_PROVIDER === 'openai' && process.env.OPENAI_API_KEY) {
       llmAdapter = LLMFactory.create('openai', {
-        apiKey: fastify.config.OPENAI_API_KEY,
-        baseUrl: fastify.config.OPENAI_BASE_URL,
-        model: fastify.config.OPENAI_MODEL
+        apiKey: process.env.OPENAI_API_KEY,
+        baseUrl: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini'
       });
       fastify.log.info('OpenAI LLM adapter initialized');
-    } else if (fastify.config.LLM_PROVIDER === 'gpt-oss') {
+    } else if (process.env.LLM_PROVIDER === 'gpt-oss') {
       llmAdapter = LLMFactory.create('gpt-oss', {
-        baseUrl: fastify.config.LLM_BASE_URL,
-        model: fastify.config.LLM_MODEL
+        baseUrl: process.env.LLM_BASE_URL || 'http://localhost:8000',
+        model: process.env.LLM_MODEL || 'gpt-oss-20b'
       });
       fastify.log.info('gpt-oss LLM adapter initialized');
     } else {
@@ -107,14 +105,17 @@ export async function build(opts = {}) {
   // Initialize ChatOrchestrator
   const chatOrchestrator = new ChatOrchestrator(switchBotClient, llmAdapter || undefined);
 
-  // Add services to fastify instance
+  // Add services to fastify instance (before ready)
   fastify.decorate('switchBotClient', switchBotClient);
   fastify.decorate('chatOrchestrator', chatOrchestrator);
 
-  // Register route plugins (simple approach)
+  // Register route plugins (before ready)
   fastify.register(require('./routes/switchbot'), { prefix: '/api/switchbot' });
   fastify.register(require('./routes/chat'), { prefix: '/api' });
   fastify.register(require('./routes/webhooks'), { prefix: '/api/webhooks' });
+
+  // Wait for environment variables to be loaded
+  await fastify.ready();
 
   return fastify;
 }
