@@ -1,10 +1,5 @@
-export { 
-  harmonyToolsSchema,
-  validateToolCall,
-  createToolResponse,
-  HARMONY_TOOLS,
-  SWITCHBOT_TOOLS_SCHEMA 
-} from './schema';
+export * from './schema';
+export * from './llm-adapter';
 
 export type {
   HarmonyTool,

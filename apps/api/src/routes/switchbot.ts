@@ -1,18 +1,10 @@
 import { FastifyPluginAsync } from 'fastify';
-import { SwitchBotClient } from '@llm-switchbot/switchbot-adapter';
 import { CommandRequest, CommandResponse } from '@llm-switchbot/shared';
 
 const switchbotRoutes: FastifyPluginAsync = async function (fastify) {
-  // SwitchBotクライアントを初期化
+  // SwitchBotクライアントをfastifyインスタンスから取得
   const getSwitchBotClient = () => {
-    const token = process.env.SWITCHBOT_TOKEN || 'demo-token';
-    const secret = process.env.SWITCHBOT_SECRET || 'demo-secret';
-    
-    if (!token || !secret) {
-      throw new Error('SwitchBot credentials not configured');
-    }
-    
-    return new SwitchBotClient(token, secret);
+    return fastify.switchBotClient;
   };
 
   // デバイス一覧取得

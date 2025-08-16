@@ -4,8 +4,7 @@ describe('API Server', () => {
   let app: any;
 
   beforeEach(async () => {
-    app = build({ logger: false });
-    await app.ready(); // プラグインの登録を待つ
+    app = await build({ logger: false });
   });
 
   afterEach(async () => {

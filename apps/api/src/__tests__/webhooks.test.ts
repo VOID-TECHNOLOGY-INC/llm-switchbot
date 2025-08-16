@@ -6,7 +6,7 @@ describe('SwitchBot Webhooks', () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {
-    app = build({ logger: false });
+    app = await build({ logger: false });
     await app.ready();
     
     // Webhook秘密鍵をテスト用に設定
