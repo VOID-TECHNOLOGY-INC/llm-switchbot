@@ -1,6 +1,4 @@
 import { FastifyPluginAsync } from 'fastify';
-import { SwitchBotClient } from '@llm-switchbot/switchbot-adapter';
-import { ChatOrchestrator } from '../orchestrator/chat-orchestrator';
 
 interface ChatRequestBody {
   messages: Array<{
@@ -11,12 +9,8 @@ interface ChatRequestBody {
 }
 
 const chatRoutes: FastifyPluginAsync = async function (fastify) {
-  // Chat Orchestrator インスタンスの初期化
-  const switchBotClient = new SwitchBotClient(
-    process.env.SWITCHBOT_TOKEN || 'demo-token',
-    process.env.SWITCHBOT_SECRET || 'demo-secret'
-  );
-  const orchestrator = new ChatOrchestrator(switchBotClient);
+  // Chat Orchestrator インスタンスをfastifyから取得
+  const orchestrator = fastify.chatOrchestrator;
 
   // POST /chat - チャット処理
   fastify.post<{ Body: ChatRequestBody }>('/chat', async (request, reply) => {

@@ -5,7 +5,7 @@ describe('E2E Integration Tests', () => {
   let app: FastifyInstance;
 
   beforeEach(async () => {
-    app = build({ logger: false });
+    app = await build({ logger: false });
     await app.ready();
   });
 

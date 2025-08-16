@@ -5,7 +5,10 @@ import {
   createToolResponse,
   HARMONY_TOOLS,
   type HarmonyToolsSchema,
-  type ToolResponse
+  type ToolResponse,
+  LLMFactory,
+  LLMAdapter,
+  LLMRequest
 } from '@llm-switchbot/harmony-tools';
 
 export interface ToolCall {
@@ -39,9 +42,11 @@ export interface ChatProcessResult {
  */
 export class ChatOrchestrator {
   private switchBotClient: SwitchBotClient;
+  private llmAdapter: LLMAdapter | null = null;
 
-  constructor(switchBotClient: SwitchBotClient) {
+  constructor(switchBotClient: SwitchBotClient, llmAdapter?: LLMAdapter) {
     this.switchBotClient = switchBotClient;
+    this.llmAdapter = llmAdapter || null;
   }
 
   /**
@@ -148,9 +153,61 @@ export class ChatOrchestrator {
   ): Promise<ChatProcessResult> {
     const toolResults: ToolResponse[] = [];
 
-    // デモモード：実際のLLM統合前の基本的な応答生成
+    // LLMアダプターが利用可能な場合は実際のLLMを使用
+    if (this.llmAdapter) {
+      try {
+        const llmRequest: LLMRequest = {
+          messages: messages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          tools: enableTools ? harmonyToolsSchema.tools : undefined,
+          temperature: 0.7,
+          max_tokens: 1000
+        };
+
+        const llmResponse = await this.llmAdapter.chat(llmRequest);
+        
+        // ツール呼び出しの処理
+        if (llmResponse.tool_calls && llmResponse.tool_calls.length > 0) {
+          for (const toolCall of llmResponse.tool_calls) {
+            const toolResult = await this.processToolCall(toolCall);
+            toolResults.push(toolResult);
+          }
+        }
+
+        const response: ChatResponse = {
+          role: 'assistant',
+          content: llmResponse.content,
+          tool_calls: llmResponse.tool_calls
+        };
+
+        return {
+          response,
+          toolResults
+        };
+
+      } catch (error) {
+        console.error('LLM処理エラー:', error);
+        // フォールバック: デモモード
+        return this.processChatDemo(messages, enableTools);
+      }
+    }
+
+    // LLMアダプターが利用できない場合はデモモード
+    return this.processChatDemo(messages, enableTools);
+  }
+
+  /**
+   * デモモードでのチャット処理
+   */
+  private async processChatDemo(
+    messages: ChatMessage[], 
+    enableTools: boolean = false
+  ): Promise<ChatProcessResult> {
+    const toolResults: ToolResponse[] = [];
+
     if (enableTools && this.shouldUseTool(messages)) {
-      // 簡単なキーワードマッチングでツール呼び出しを決定（デモ用）
       const lastMessage = messages[messages.length - 1];
       const toolCall = this.generateMockToolCall(lastMessage.content);
       
@@ -160,7 +217,6 @@ export class ChatOrchestrator {
       }
     }
 
-    // 応答生成（デモモード）
     const response: ChatResponse = {
       role: 'assistant',
       content: this.generateMockResponse(messages, toolResults)
