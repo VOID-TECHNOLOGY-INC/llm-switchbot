@@ -223,6 +223,13 @@ POST /api/webhooks/switchbot
 
 #### 未対応事項・技術債務
 
+- **CIテストエラーの修正完了**: 新しく追加したワークフロー機能のテストでSwitchBotClientモック設定の問題を解決
+  - 修正内容: `condition-evaluator.test.ts`のモック設定を既存パターンに統一
+  - 変更: `jest.MockedClass`を使用したモック設定、メソッドの明示的モック化
+  - 結果: CIテストが正常に実行されるようになった
+  - 影響: ワークフロー機能のテストカバレッジが完全に動作
+  - 状態: ✅ 修正完了
+
 - **ESLint設定の完全修正**: API アプリのESLint TypeScript設定が一時的にスキップ状態
   - 現状: `lint: "echo 'Linting skipped for now' && exit 0"`
   - 対策: TypeScript ESLintプラグインの依存関係修正、`.eslintrc.json`の完全設定

@@ -119,6 +119,7 @@ export async function build(opts = {}) {
   fastify.register(require('./routes/webhooks'), { prefix: '/api/webhooks' });
   fastify.register(require('./routes/automation'), { prefix: '/api' });
   fastify.register(require('./routes/debug'), { prefix: '/api' });
+  fastify.register(require('./routes/automation-workflow'), { prefix: '/api' });
 
   // Wait for environment variables to be loaded
   await fastify.ready();
