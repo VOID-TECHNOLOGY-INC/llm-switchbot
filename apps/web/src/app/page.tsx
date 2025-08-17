@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react'
 import { ChatInterface } from '@/components/ChatInterface'
 import { DeviceCard } from '@/components/DeviceCard'
+import { WorkflowCreator } from '@/components/WorkflowCreator'
+import { WorkflowManager } from '@/components/WorkflowManager'
 import { Device } from '@llm-switchbot/shared'
-import { HomeIcon, CpuChipIcon } from '@heroicons/react/24/outline'
+import { HomeIcon, CpuChipIcon, CogIcon } from '@heroicons/react/24/outline'
 
 // ChatMessage型の定義
 export interface ChatMessage {
@@ -70,26 +72,32 @@ export default function Home() {
   const [devices, setDevices] = useState<Device[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [devicesLoading, setDevicesLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'chat' | 'workflow'>('chat')
 
   // デバイス一覧を取得する関数
   const fetchDevices = async () => {
     try {
       setDevicesLoading(true)
-      const response = await fetch('http://localhost:3001/api/switchbot/devices')
+      console.log('🔄 デバイス取得開始...')
+      
+      const response = await fetch('http://localhost:3002/api/switchbot/devices')
+      console.log('📡 API レスポンス:', response.status, response.ok)
       
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`)
       }
       
       const data = await response.json()
+      console.log('📄 受信データ:', data)
       
       // SwitchBotのデバイス情報をDevice型に変換
       const convertedDevices: Device[] = []
       
       // 物理デバイス
       if (data.body?.deviceList) {
+        console.log(`🔌 物理デバイス: ${data.body.deviceList.length}件`)
         data.body.deviceList.forEach((device: any) => {
-          convertedDevices.push({
+          const convertedDevice = {
             id: device.deviceId,
             type: device.deviceType,
             name: device.deviceName,
@@ -100,14 +108,17 @@ export default function Home() {
               deviceType: device.deviceType
             },
             updatedAt: new Date()
-          })
+          }
+          console.log('➕ 物理デバイス追加:', convertedDevice)
+          convertedDevices.push(convertedDevice)
         })
       }
       
       // 赤外線リモート
       if (data.body?.infraredRemoteList) {
+        console.log(`📺 リモートデバイス: ${data.body.infraredRemoteList.length}件`)
         data.body.infraredRemoteList.forEach((remote: any) => {
-          convertedDevices.push({
+          const convertedRemote = {
             id: remote.deviceId,
             type: remote.remoteType,
             name: remote.deviceName,
@@ -118,17 +129,22 @@ export default function Home() {
               remoteType: remote.remoteType
             },
             updatedAt: new Date()
-          })
+          }
+          console.log('➕ リモートデバイス追加:', convertedRemote)
+          convertedDevices.push(convertedRemote)
         })
       }
       
+      console.log('✅ 変換完了:', convertedDevices.length, 'デバイス')
       setDevices(convertedDevices)
     } catch (error) {
-      console.error('デバイス取得エラー:', error)
+      console.error('❌ デバイス取得エラー:', error)
+      console.log('🔄 モックデバイスを使用')
       // エラー時はモックデバイスを表示
       setDevices(mockDevices)
     } finally {
       setDevicesLoading(false)
+      console.log('🏁 fetchDevices 完了')
     }
   }
 
@@ -223,7 +239,7 @@ export default function Home() {
 
     try {
       // 実際のAPI呼び出し
-      const response = await fetch('http://localhost:3001/api/chat', {
+      const response = await fetch('http://localhost:3002/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -269,7 +285,7 @@ export default function Home() {
     
     try {
       // 実際のAPI呼び出し
-      const response = await fetch('http://localhost:3001/api/switchbot/command', {
+      const response = await fetch('http://localhost:3002/api/switchbot/command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId, command, parameter })
@@ -368,13 +384,63 @@ export default function Home() {
           </div>
         </aside>
 
-        {/* メインエリア - チャット */}
+        {/* メインエリア - タブ切り替え */}
         <div className="flex-1 flex flex-col min-w-0">
-          <ChatInterface
-            messages={messages}
-            onSendMessage={handleSendMessage}
-            isLoading={isLoading}
-          />
+          {/* タブナビゲーション */}
+          <div className="bg-white border-b border-gray-200">
+            <nav className="flex space-x-8 px-6" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'chat'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <CpuChipIcon className="h-5 w-5" />
+                  <span>💬 AI チャット</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('workflow')}
+                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'workflow'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <CogIcon className="h-5 w-5" />
+                  <span>🤖 自動化ワークフロー</span>
+                </div>
+              </button>
+            </nav>
+          </div>
+
+          {/* タブコンテンツ */}
+          <div className="flex-1 bg-gray-50">
+            {activeTab === 'chat' ? (
+              <ChatInterface
+                messages={messages}
+                onSendMessage={handleSendMessage}
+                isLoading={isLoading}
+              />
+            ) : (
+              <div className="p-6 space-y-6">
+                <WorkflowCreator 
+                  onWorkflowSaved={(rule) => {
+                    console.log('ワークフロー保存:', rule);
+                  }} 
+                />
+                <WorkflowManager 
+                  onRuleUpdated={() => {
+                    console.log('ルール更新');
+                  }} 
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

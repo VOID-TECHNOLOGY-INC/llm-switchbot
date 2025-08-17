@@ -172,6 +172,80 @@ export interface ProposalValidation {
   issues?: string[];
 }
 
+// Automation Workflow Types
+export interface AutomationRule {
+  id: string;
+  name: string;
+  description: string;
+  isEnabled: boolean;
+  conditions: RuleCondition[];
+  actions: RuleAction[];
+  schedule?: RuleSchedule;
+  createdAt: string;
+  updatedAt: string;
+  userId: string;
+  lastExecuted?: string;
+  executionCount: number;
+}
+
+export interface RuleCondition {
+  type: 'time' | 'temperature' | 'humidity' | 'device_state' | 'scene';
+  operator: 'equals' | 'greater_than' | 'less_than' | 'between' | 'contains';
+  value: any;
+  deviceId?: string;
+  tolerance?: number; // 許容誤差（例：温度±1度）
+}
+
+export interface RuleAction {
+  type: 'device_control' | 'scene_execution' | 'notification';
+  deviceId?: string;
+  command?: string;
+  parameters?: any;
+  sceneId?: string;
+  message?: string;
+  delay?: number; // 遅延実行（秒）
+}
+
+export interface RuleSchedule {
+  type: 'once' | 'daily' | 'weekly' | 'interval';
+  time?: string; // HH:MM format
+  days?: number[]; // 0=Sunday, 1=Monday, etc.
+  interval?: number; // minutes for interval type
+  timezone?: string;
+}
+
+export interface RuleExecution {
+  id: string;
+  ruleId: string;
+  executedAt: string;
+  status: 'success' | 'failure' | 'partial';
+  results: RuleActionResult[];
+  conditions: RuleConditionResult[];
+}
+
+export interface RuleActionResult {
+  actionIndex: number;
+  status: 'success' | 'failure' | 'skipped';
+  result?: any;
+  error?: string;
+  executedAt: string;
+}
+
+export interface RuleConditionResult {
+  conditionIndex: number;
+  matched: boolean;
+  actualValue: any;
+  expectedValue: any;
+  evaluatedAt: string;
+}
+
+export interface AutomationWorkflow {
+  naturalLanguage: string;
+  parsedRule: AutomationRule;
+  confidence: number;
+  suggestedModifications?: string[];
+}
+
 // Scene Learning Types
 export interface OperationRecord {
   deviceId: string;
