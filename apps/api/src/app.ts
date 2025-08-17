@@ -42,7 +42,9 @@ const envSchema = {
     OPENAI_MODEL: { type: 'string', default: 'gpt-4o-mini' },
     LLM_BASE_URL: { type: 'string', default: 'http://localhost:8000' },
     LLM_MODEL: { type: 'string', default: 'gpt-oss-20b' },
-    LLM_API_KEY: { type: 'string', default: '' }
+    LLM_API_KEY: { type: 'string', default: '' },
+    OLLAMA_BASE_URL: { type: 'string', default: 'http://localhost:11434' },
+    OLLAMA_MODEL: { type: 'string', default: 'gpt-oss-20b' }
   },
   required: []
 };
@@ -93,6 +95,12 @@ export async function build(opts = {}) {
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini'
       });
       fastify.log.info('OpenAI LLM adapter initialized');
+    } else if (process.env.LLM_PROVIDER === 'ollama') {
+      llmAdapter = LLMFactory.create('ollama', {
+        baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+        model: process.env.OLLAMA_MODEL || 'gpt-oss-20b'
+      });
+      fastify.log.info('Ollama LLM adapter initialized');
     } else if (process.env.LLM_PROVIDER === 'gpt-oss') {
       llmAdapter = LLMFactory.create('gpt-oss', {
         baseUrl: process.env.LLM_BASE_URL || 'http://localhost:8000',
