@@ -70,13 +70,47 @@ SWITCHBOT_TOKEN=your_switchbot_token_here
 SWITCHBOT_SECRET=your_switchbot_secret_here
 SWITCHBOT_WEBHOOK_VERIFY_TOKEN=your_webhook_verify_token_here
 
-# LLM Configuration  
+# LLM Configuration (Choose one)
+# Option 1: OpenAI API
+LLM_PROVIDER=openai
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4o-mini
+
+# Option 2: Ollama (Recommended for local deployment)
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=gpt-oss-20b
+
+# Option 3: Direct gpt-oss
+LLM_PROVIDER=gpt-oss
 LLM_BASE_URL=http://localhost:8000
 LLM_MODEL=gpt-oss-20b
-LLM_API_KEY=optional_api_key_here
 ```
 
 ### Development
+
+#### **Option 1: Using Ollama (Recommended)**
+
+```bash
+# Install Ollama
+brew install ollama  # macOS
+# or
+curl -fsSL https://ollama.ai/install.sh | sh  # Linux
+
+# Download gpt-oss-20b model
+ollama pull gpt-oss-20b
+
+# Start Ollama server
+ollama serve
+
+# Start API server (in another terminal)
+pnpm --filter api dev
+
+# Start web frontend (in another terminal)
+pnpm --filter web dev
+```
+
+#### **Option 2: Using OpenAI API**
 
 ```bash
 # Start API server
@@ -84,7 +118,24 @@ pnpm --filter api dev
 
 # Start web frontend (in another terminal)
 pnpm --filter web dev
+```
 
+#### **Option 3: Using Direct gpt-oss**
+
+```bash
+# Install and start gpt-oss server
+# (See detailed instructions in docs/gpt-oss-setup.md)
+
+# Start API server
+pnpm --filter api dev
+
+# Start web frontend (in another terminal)
+pnpm --filter web dev
+```
+
+#### **Testing and Building**
+
+```bash
 # Run tests
 pnpm test
 
