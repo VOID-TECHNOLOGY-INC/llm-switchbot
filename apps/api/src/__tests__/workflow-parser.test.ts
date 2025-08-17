@@ -17,7 +17,7 @@ describe('WorkflowParserService', () => {
       expect(workflow.naturalLanguage).toBe(naturalLanguage);
       expect(workflow.parsedRule.userId).toBe(userId);
       expect(workflow.parsedRule.isEnabled).toBe(true);
-      expect(workflow.parsedRule.conditions).toHaveLength(2); // 時刻 + 温度
+      expect(workflow.parsedRule.conditions).toHaveLength(1); // 温度条件のみ（時刻はscheduleとして処理）
       expect(workflow.parsedRule.actions).toHaveLength(1); // エアコンON
       expect(workflow.parsedRule.schedule).toBeDefined();
       expect(workflow.confidence).toBeGreaterThan(0.5);
@@ -32,6 +32,7 @@ describe('WorkflowParserService', () => {
       expect(workflow.parsedRule.schedule?.time).toBe('20:00');
       expect(workflow.parsedRule.actions).toHaveLength(1);
       expect(workflow.parsedRule.actions[0].command).toBe('turnOff');
+      expect(workflow.parsedRule.conditions).toHaveLength(0); // 時刻条件はscheduleとして処理されるため
     });
 
     it('should handle temperature conditions', async () => {

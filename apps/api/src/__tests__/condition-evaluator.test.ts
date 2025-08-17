@@ -79,6 +79,7 @@ describe('ConditionEvaluatorService', () => {
     });
 
     it('should handle multiple conditions (AND logic)', async () => {
+      // 温度条件のモックを設定
       mockSwitchBotClient.getDeviceStatus.mockResolvedValue({
         statusCode: 100,
         message: 'success',

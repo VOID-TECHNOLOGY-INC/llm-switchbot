@@ -155,7 +155,8 @@ export class WorkflowParserService {
       { pattern: /エアコン.*?つけ/g, action: { type: 'device_control' as const, deviceId: '02-202212241621-96856893', command: 'turnOn' } },
       { pattern: /エアコン.*?消/g, action: { type: 'device_control' as const, deviceId: '02-202212241621-96856893', command: 'turnOff' } },
       { pattern: /照明.*?つけ/g, action: { type: 'device_control' as const, command: 'turnOn' } },
-      { pattern: /照明.*?消/g, action: { type: 'device_control' as const, command: 'turnOff' } }
+      { pattern: /照明.*?消/g, action: { type: 'device_control' as const, command: 'turnOff' } },
+      { pattern: /照明.*?暗く/g, action: { type: 'device_control' as const, command: 'turnOff' } }
     ];
 
     for (const actionPattern of actionPatterns) {
