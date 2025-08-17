@@ -26,7 +26,7 @@ export class WorkflowParserService {
         max_tokens: 1000
       });
 
-      const parsedContent = response.choices[0]?.message?.content;
+      const parsedContent = response.content;
       if (!parsedContent) {
         throw new Error('LLMからの応答が空です');
       }
