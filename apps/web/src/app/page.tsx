@@ -80,7 +80,7 @@ export default function Home() {
       setDevicesLoading(true)
       console.log('🔄 デバイス取得開始...')
       
-      const response = await fetch('http://localhost:3002/api/switchbot/devices')
+      const response = await fetch('http://localhost:3001/api/switchbot/devices')
       console.log('📡 API レスポンス:', response.status, response.ok)
       
       if (!response.ok) {
@@ -239,14 +239,19 @@ export default function Home() {
 
     try {
       // 実際のAPI呼び出し
-      const response = await fetch('http://localhost:3002/api/chat', {
+      const requestBody = { 
+        messages: [...messages, userMessage], 
+        enableTools: true 
+      }
+      console.log('📤 チャットリクエスト:', requestBody)
+      
+      const response = await fetch('http://localhost:3001/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          messages: [...messages, userMessage], 
-          enableTools: true 
-        })
+        body: JSON.stringify(requestBody)
       })
+      
+      console.log('📡 チャットレスポンス:', response.status, response.ok)
       
       if (!response.ok) {
         throw new Error(`API Error: ${response.status}`);
@@ -285,7 +290,7 @@ export default function Home() {
     
     try {
       // 実際のAPI呼び出し
-      const response = await fetch('http://localhost:3002/api/switchbot/command', {
+              const response = await fetch('http://localhost:3001/api/switchbot/command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId, command, parameter })
