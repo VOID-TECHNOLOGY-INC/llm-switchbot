@@ -87,6 +87,58 @@ export class OpenAIAdapter implements LLMAdapter {
   }
 }
 
+// Ollama アダプター
+export class OllamaAdapter implements LLMAdapter {
+  name = 'ollama';
+  
+  constructor(
+    private baseUrl: string = 'http://localhost:11434',
+    private model: string = 'gpt-oss-20b'
+  ) {}
+
+  async chat(request: LLMRequest): Promise<LLMResponse> {
+    const response = await fetch(`${this.baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: request.messages,
+        stream: false,
+        options: {
+          temperature: request.temperature || 0.1,
+          num_predict: request.max_tokens || 1000,
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({})) as any;
+      throw new Error(`Ollama API Error: ${response.status} - ${error.error || 'Unknown error'}`);
+    }
+
+    const data = await response.json() as any;
+
+    return {
+      content: data.message.content || '',
+      tool_calls: data.message.tool_calls?.map((call: any) => ({
+        id: call.id,
+        type: call.type,
+        function: {
+          name: call.function.name,
+          arguments: call.function.arguments,
+        },
+      })),
+      usage: {
+        prompt_tokens: data.prompt_eval_count || 0,
+        completion_tokens: data.eval_count || 0,
+        total_tokens: (data.prompt_eval_count || 0) + (data.eval_count || 0),
+      },
+    };
+  }
+}
+
 // gpt-oss アダプター（将来の実装用）
 export class GPTOSSAdapter implements LLMAdapter {
   name = 'gpt-oss';
@@ -110,6 +162,11 @@ export class LLMFactory {
       case 'openai':
         return new OpenAIAdapter(
           config.apiKey,
+          config.baseUrl,
+          config.model
+        );
+      case 'ollama':
+        return new OllamaAdapter(
           config.baseUrl,
           config.model
         );
