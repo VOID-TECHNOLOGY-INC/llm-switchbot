@@ -45,18 +45,24 @@
 
 ## 4. 主要技術仕様
 
-### 4.1 LLM（gpt-oss）
+### 4.1 LLM（マルチアダプター対応）
 
 * **モデル選択**
 
   * デフォルト：`gpt-oss-20b`（16GBクラスで動作可）
   * 高精度：`gpt-oss-120b`（80GB GPUで単機稼働、MXFP4量子化）([GitHub][3])
+* **マルチLLMアダプター**：環境や要件に応じてプロバイダを切り替え可能
+  * `OpenAIAdapter`：OpenAI API 互換（gpt-4o-mini 等）。開発/テスト用、およびクラウド環境向け。
+  * `OllamaAdapter`：Ollama ローカル推論。`gpt-oss-20b` のローカル実行に使用。
+  * `GPTOSSAdapter`：gpt-oss ネイティブ API（harmony 形式対応）。本番推奨。
+  * `LLMFactory`：環境変数 `LLM_PROVIDER` により動的にアダプターを生成。
 * **I/O形式**：OpenAI **harmony**（マルチチャネル出力、ツールコール前提）([GitHub][7])
 * **プロンプト戦略**
 
   * システム：家電ドメインの**ポリシー**（安全・許可・確認）
-  * ツール：`get_devices`, `get_status`, `send_command`, `create_scene`, `exec_scene`
+  * ツール：`get_devices`, `get_status`, `send_command`, `get_scenes`, `exec_scene`
   * メモリ：最近の環境値（温湿度/在宅/時刻/就寝スケジュール）
+* **フォールバック戦略**：LLM が利用不可の場合、パターンマッチングベースの解析にフォールバック（WorkflowParser 等）
 
 ### 4.2 SwitchBot API v1.1
 
@@ -77,6 +83,8 @@
 
 ## 5. API（自作バックエンド）の設計（抜粋）
 
+### 5.1 チャット/デバイス操作 API
+
 ```
 POST /api/chat
   body: { messages: [...], toolsAllowed: true }
@@ -95,25 +103,141 @@ POST /api/webhooks/switchbot  // 受信エンドポイント
 
 * **署名生成**：`sign = base64(HMAC_SHA256(secret, token + t + nonce))`（公式例に準拠）。([GitHub][1])
 
-## 6. セキュリティ/プライバシ
+### 5.2 自動化ワークフロー API
+
+```
+POST /api/automation/workflow/parse
+  body: { naturalLanguage: string, userId?: string }
+  res:  { success, workflow: AutomationWorkflow, message }
+
+POST /api/automation/workflow/save
+  body: { workflow: AutomationWorkflow }
+  res:  { success, rule: AutomationRule, message }
+
+GET  /api/automation/workflow/rules
+  res:  { success, rules: AutomationRule[], count }
+
+GET  /api/automation/workflow/rules/:ruleId
+PUT  /api/automation/workflow/rules/:ruleId
+DELETE /api/automation/workflow/rules/:ruleId
+
+PATCH /api/automation/workflow/rules/:ruleId/toggle
+  body: { enabled: boolean }
+
+POST /api/automation/workflow/rules/:ruleId/execute    // 手動実行
+GET  /api/automation/workflow/rules/:ruleId/history     // 実行履歴
+
+POST /api/automation/workflow/conditions/evaluate       // 条件テスト
+  body: { conditions: RuleCondition[] }
+```
+
+### 5.3 自動化提案/シーン学習 API
+
+```
+POST /api/automation/proposals
+  body: { events: AutomationEvent[] }
+  res:  { proposals: AutomationProposal }
+
+POST /api/automation/proposals/validate
+  body: { suggestion: AutomationSuggestion }
+  res:  { validation: ProposalValidation }
+
+POST /api/scenes/learn/record
+  body: { operation: OperationRecord }
+
+GET  /api/scenes/learn/patterns
+  res:  { patterns: OperationPattern[] }
+
+POST /api/scenes/learn/candidates
+  body: { context: SceneLearningContext }
+  res:  { candidates: SceneCandidate[] }
+```
+
+## 6. ワークフローエンジン（自動化基盤）
+
+本システムの中核機能として、自然言語から自動化ルールを生成・実行するワークフローエンジンを備える。
+
+### 6.1 自然言語ワークフローパーサー（WorkflowParser）
+
+* **LLM 解析モード**：自然言語入力を LLM に渡し、構造化された `AutomationRule`（条件・アクション・スケジュール）を JSON で取得。温度 0.1 で安定した出力を得る。
+* **フォールバック解析**：LLM 不可時はパターンマッチングで解析（時刻表現「朝/昼/夕方/夜」、温度条件「暑かったら/寒かったら」、アクション「エアコンつけて/消して」等）。
+* **信頼度スコア**：条件・アクション・スケジュールの解析成功度から 0.0–1.0 の信頼度を算出。LLM 解析成功時は 0.9。
+* **改善提案**：解析結果に不足がある場合、ユーザへの改善提案を自動生成（例：「エアコンの設定温度も指定すると効果的です」）。
+
+### 6.2 条件評価エンジン（ConditionEvaluator）
+
+以下の条件タイプをリアルタイムに評価：
+
+| 条件タイプ | 説明 | データソース |
+|---|---|---|
+| `time` | 時刻条件（一致・範囲・前後） | システム時刻 |
+| `temperature` | 温度条件（閾値・範囲） | SwitchBot 温湿度計 |
+| `humidity` | 湿度条件（閾値・範囲） | SwitchBot 温湿度計 |
+| `device_state` | デバイス状態条件 | SwitchBot API `/status` |
+
+* 各条件に**許容誤差（tolerance）**を設定可能（温度 ±0.5°C、時刻 ±2分 等）。
+* 複数条件は AND 評価（すべて満たされた場合のみアクション実行）。
+
+### 6.3 自動化スケジューラー（AutomationScheduler）
+
+* **スケジュールタイプ**：`once`（一度きり）、`daily`（毎日）、`weekly`（週次）、`interval`（N分間隔）
+* **実行フロー**：スケジュール条件チェック → 条件評価 → アクション実行（デバイス制御/シーン実行/通知）
+* **遅延実行**：アクション単位で遅延（delay秒）設定可能
+* **実行履歴**：ルールごとに最大50件の実行履歴を保持（ステータス: success/failure/partial）
+* **冪等性**：同一ルールの重複実行を防止
+
+### 6.4 自動化提案サービス（AutomationProposal）
+
+* **ルールベース提案**：時間帯・デバイスタイプ・センサー閾値に基づく自動化を提案
+* **カテゴリ**：照明（lighting）、空調（climate）、セキュリティ（security）、快適性（comfort）、省エネ（energy）
+
+### 6.5 シーン学習サービス（SceneLearning）
+
+* **パターン検出**：
+  * 順次操作パターン（短時間内に連続実行されるコマンド群）
+  * 時間ベースパターン（特定時間帯に繰り返される操作）
+  * 頻出操作パターン（高頻度で実行されるコマンド）
+* **シーン候補生成**：検出パターンから信頼度付きシーン候補を自動生成
+* **学習済みシーン管理**：ユーザ承認後、自動生成シーンとして保存・実行
+
+## 7. リアルタイム通信
+
+* **Webhook → UI 反映**：SwitchBot Webhook イベントをバックエンドで受信後、接続中のフロントエンドへ即時配信。
+* **方式**：SSE（Server-Sent Events）を優先採用（シンプルかつ HTTP/2 互換）。将来的に WebSocket への移行も可能。
+* **対象イベント**：デバイス状態変更、センサー閾値超過、ドア開閉、モーション検知、水漏れ検知。
+* **目標遅延**：Webhook 受信 → UI 反映 ≤ 3秒（ローカル回線時）。
+
+## 8. エラーハンドリング/グレースフルデグラデーション
+
+* **LLM 障害時**：パターンマッチング解析へフォールバック、直接デバイス操作 UI を提供。
+* **SwitchBot API 障害時**：キャッシュされた最新状態を表示、操作はキューイングして API 復旧後にリトライ。
+* **ネットワーク障害時**：ローカルキャッシュでの表示継続、オフラインバナー表示。
+* **エラー分類と応答**：
+  * `4xx`：ユーザへの具体的なエラー表示と修正ガイド
+  * `5xx`：自動リトライ + ユーザへの代替案提示
+  * レート制限（`429`/`401`）：指数バックオフ + クォータ残量通知
+
+## 9. セキュリティ/プライバシ
 
 * SwitchBot **トークン/シークレットはKMS/Secret Manager**で保護、サーバ側のみ保持。
 * 危険コマンドは**二段階確認**（例：鍵の解錠は在宅・時刻・ジオフェンス条件をLLMで評価→最後にユーザ確認）。
 * Webhookは**検証トークン**と**IP許可**で保護。
+* **操作監査ログ**：セキュリティ重要操作（解錠、シーン作成・実行、自動化ルール変更）の全アクションを `requestId`, `userId`, `deviceId`, `command`, `timestamp` 付きで記録。
+* **Webhook リプレイ防止**：`t`/`nonce`/署名の検証に加え、受信済み nonce の一定期間キャッシュで重複配信を排除。
 
-## 7. 信頼性・スロットリング
+## 10. 信頼性・スロットリング
 
 * **レート保護**：ユーザ毎・デバイス毎のクォータ、バッチ化、状態キャッシュ（`/status`のポーリング最小化）。**1万/日**の制限に対して、PullよりWebhook優先。([GitHub][1])
 * リトライは指数バックオフ、429/401時の再試行ポリシー（トークン再生成）。
 
-## 8. 評価指標（デモ審査向け）
+## 11. 評価指標（デモ審査向け）
 
 * **Intent成功率**（正しく家電を操作できた割合）
 * **対話→操作レイテンシ**（p50/p95）
 * **イベント追従性**（WebhookからUI反映までの遅延）
 * **シーン推薦の受容率**（ユーザが採用した割合）
 
-## 9. 実装計画（ハッカソン向けスプリント）
+## 12. 実装計画（ハッカソン向けスプリント）
 
 `doc/plan.md` にて詳細なタスクとスケジュールを定義。
 
@@ -121,19 +245,23 @@ POST /api/webhooks/switchbot  // 受信エンドポイント
 * **Day 3–4**: LLM連携（harmony）、Webhook 受信、E2E疎通
 * **Day 5–6**: 自動化・シーン機能、デモ準備、撮影、提出
 
-## 10. デモシナリオ（提出動画）
+## 13. デモシナリオ（提出動画）
 
 1. 玄関で「外出する」→ ロック施錠・照明OFF・カーテン閉・ロボ掃除機予約。
 2. 帰宅 → Webhookでドア開検知 → LLMが「ただいまモード」を提案（照明ON、空調最適）。([GitHub][1])
 
-## 11. 代替/拡張案（アイデア出し）
+## 14. 代替/拡張案（アイデア出し）
 
 * **安全モード**：深夜は「解錠コマンド」を無効化し、代わりに家族への確認通知。
 * **コンテキスト融合**：天気/電気料金APIと組み合わせ、**時間帯別最適化**。
 * **HAエコシステム公開**：RoomSense GPTをHAアドオンとして配布（BLE/Matter併用）。([Home Assistant][6])
 * **ローカル優先**：家庭LAN内で20Bを動かし、会話と制御を**完全ローカル**化（プライバシ強化）。([OpenAI][4])
+* **マルチユーザ対応**：家族メンバーごとの権限管理（子供は照明のみ、大人はフルアクセス等）。
+* **音声入力統合**：Web Speech API や Whisper を用いた音声→テキスト変換でハンズフリー操作。
+* **デバイスグルーピング/ルーム管理**：デバイスを部屋単位でグルーピングし、「リビングの電気を全部消して」のような部屋指定操作に対応。
+* **操作ダッシュボード**：デバイスの操作頻度、エネルギー消費推定、自動化ルールの実行統計を可視化するダッシュボード。
 
-## 12. 参考（必読リンク）
+## 15. 参考（必読リンク）
 
 * OpenAI Devpost ハッカソン概要/ルール/スケジュール。([OpenAI Open Model Hackathon][2])
 * gpt-oss 公式発表とGitHub（MXFP4やモデル特性）。([OpenAI][4], [GitHub][3])
