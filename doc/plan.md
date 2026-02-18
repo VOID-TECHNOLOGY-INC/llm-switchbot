@@ -174,7 +174,11 @@ POST /api/scenes/learn/candidates          // シーン候補生成
     {
       "name": "get_devices",
       "description": "List devices",
-      "input_schema": { "type": "object", "properties": {}, "additionalProperties": false }
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     },
     {
       "name": "get_status",
@@ -204,7 +208,11 @@ POST /api/scenes/learn/candidates          // シーン候補生成
     {
       "name": "get_scenes",
       "description": "List scenes",
-      "input_schema": { "type": "object", "properties": {}, "additionalProperties": false }
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     },
     {
       "name": "exec_scene",
@@ -269,14 +277,12 @@ POST /api/scenes/learn/candidates          // シーン候補生成
 
 ##### 🔧 対応予定
 
-- **固定プロンプトの問題**: ChatOrchestrator のシステムメッセージがハードコード
-  - デバイスID が固定（F66854E650BE 等）、デバイス一覧が静的、設定変更不可
-  - 実装アプローチ:
-    - `generateSystemMessage()` メソッド: SwitchBot API から動的デバイス情報を取得
-    - プロンプトテンプレートファイル化: `config/system-prompts.ts` の作成
-    - 環境変数対応: `SYSTEM_PROMPT_TEMPLATE`, `RESTRICTED_DEVICES` 等の追加
-    - フォールバック: デバイス取得失敗時は基本プロンプトを使用
-  - 優先度: Day 6以降
+- ~~**固定プロンプトの問題**: ChatOrchestrator のシステムメッセージがハードコード~~ → **解決済み**
+  - `generateSystemMessage()` で SwitchBot API から動的デバイス情報を取得
+  - `apps/api/src/config/system-prompts.ts` にプロンプトテンプレート外部化
+  - 環境変数 `RESTRICTED_DEVICES`, `SYSTEM_PROMPT_CUSTOM_INSTRUCTIONS` で設定可能
+  - デバイス取得失敗時は `FALLBACK_SYSTEM_PROMPT` にフォールバック
+  - プロンプトキャッシュ（デフォルト10分TTL）でAPI呼び出し最小化
 
 - **ESLint設定の完全修正**: API アプリの ESLint TypeScript 設定が一時的にスキップ状態
   - 対策: TypeScript ESLint プラグインの依存関係修正
@@ -317,10 +323,12 @@ POST /api/scenes/learn/candidates          // シーン候補生成
 本計画は `doc/spec.md` を技術的・戦術的に分解したものです。
 
 #### 基盤・インフラ
+
 - [x] モノレポ雛形、CI（lint/test/build）
 - [x] Secrets 設計、環境変数雛形 (`.env.example`)
 
 #### SwitchBot API 連携
+
 - [x] SwitchBot 署名ユーティリティ + 単体テスト
 - [x] Webhook 仕様調査（署名・ヘッダ検証）
 - [x] `GET /devices` 実装 + 統合テスト
@@ -331,29 +339,34 @@ POST /api/scenes/learn/candidates          // シーン候補生成
 - [x] Webhook 受信・検証・イベント保存
 
 #### LLM 連携
+
 - [x] harmony ツール定義とツールディスパッチ
 - [x] マルチ LLM アダプター（OpenAI/Ollama/gpt-oss）
-- [ ] 動的システムプロンプト生成（デバイス情報の自動反映）
-- [ ] プロンプトテンプレート外部化（`config/system-prompts.ts`）
+- [x] 動的システムプロンプト生成（デバイス情報の自動反映）
+- [x] プロンプトテンプレート外部化（`config/system-prompts.ts`）
 
 #### ワークフローエンジン（自動化基盤）
+
 - [x] 自然言語ワークフローパーサー（LLM + フォールバック）
 - [x] 条件評価エンジン（time/temperature/humidity/device_state）
 - [x] 自動化スケジューラー（daily/weekly/interval/once）
 - [x] 自動化ワークフロー CRUD API
 
 #### 自動化・シーン学習
+
 - [x] 自動化提案（ルール + プロンプト）
 - [x] シーン学習（頻出操作の自動シーン化）
 - [x] パターン検出（順次/時間/頻出操作）
 
 #### フロントエンド
+
 - [x] チャット UI（メッセージ、デバイスカード、ツール可視化、結果リフィード）
 - [x] ワークフロー作成・管理 UI
 - [ ] リアルタイムイベント反映（SSE/WebSocket）
 - [ ] デバイスグルーピング/ルーム管理 UI
 
 #### 品質・運用
+
 - [ ] ESLint 設定の完全修正（API アプリ）
 - [ ] Web テストの修正（DeviceCard パラメータ期待値）
 - [ ] Web typecheck の修正（Jest/DOM 型定義）
@@ -361,10 +374,9 @@ POST /api/scenes/learn/candidates          // シーン候補生成
 - [ ] 操作監査ログの実装
 
 #### デモ・提出
+
 - [ ] デモシナリオ・README・動画
 
 ### 18. 参照リンク
 
 - `doc/spec.md` を参照。
-
-
