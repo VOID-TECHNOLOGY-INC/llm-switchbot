@@ -270,8 +270,12 @@ POST /api/scenes/learn/candidates          // シーン候補生成
 ##### 🔧 対応予定
 
 - **固定プロンプトの問題**: ChatOrchestrator のシステムメッセージがハードコード
-  - デバイスID が固定、デバイス一覧が静的
-  - 対策: 動的デバイス情報取得、プロンプトテンプレート外部化、環境変数対応
+  - デバイスID が固定（F66854E650BE 等）、デバイス一覧が静的、設定変更不可
+  - 実装アプローチ:
+    - `generateSystemMessage()` メソッド: SwitchBot API から動的デバイス情報を取得
+    - プロンプトテンプレートファイル化: `config/system-prompts.ts` の作成
+    - 環境変数対応: `SYSTEM_PROMPT_TEMPLATE`, `RESTRICTED_DEVICES` 等の追加
+    - フォールバック: デバイス取得失敗時は基本プロンプトを使用
   - 優先度: Day 6以降
 
 - **ESLint設定の完全修正**: API アプリの ESLint TypeScript 設定が一時的にスキップ状態
