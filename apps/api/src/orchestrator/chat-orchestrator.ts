@@ -1,21 +1,26 @@
-import { SwitchBotClient } from '@llm-switchbot/switchbot-adapter';
-import { 
-  harmonyToolsSchema, 
-  validateToolCall, 
+import { SwitchBotClient } from "@llm-switchbot/switchbot-adapter";
+import {
+  harmonyToolsSchema,
+  validateToolCall,
   createToolResponse,
   HARMONY_TOOLS,
   type HarmonyToolsSchema,
   type ToolResponse,
-  LLMFactory,
   LLMAdapter,
-  LLMRequest
-} from '@llm-switchbot/harmony-tools';
-import { AutomationProposalService } from '../services/automation-proposal';
-import { SceneLearningService } from '../services/scene-learning';
+  LLMRequest,
+} from "@llm-switchbot/harmony-tools";
+import { AutomationProposalService } from "../services/automation-proposal";
+import { SceneLearningService } from "../services/scene-learning";
+import {
+  generateSystemPrompt,
+  formatDeviceInfo,
+  FALLBACK_SYSTEM_PROMPT,
+  type SystemPromptConfig,
+} from "../config/system-prompts";
 
 export interface ToolCall {
   id: string;
-  type: 'function';
+  type: "function";
   function: {
     name: string;
     arguments: string;
@@ -23,13 +28,13 @@ export interface ToolCall {
 }
 
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: "user" | "assistant" | "system";
   content: string;
   tool_calls?: ToolCall[];
 }
 
 export interface ChatResponse {
-  role: 'assistant';
+  role: "assistant";
   content: string;
   tool_calls?: ToolCall[];
 }
@@ -39,6 +44,12 @@ export interface ChatProcessResult {
   toolResults: ToolResponse[];
 }
 
+export interface ChatOrchestratorOptions extends SystemPromptConfig {
+  promptCacheTtlMs?: number;
+}
+
+const DEFAULT_PROMPT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
 /**
  * チャット処理とツール呼び出しを統合管理するオーケストレーター
  */
@@ -47,10 +58,18 @@ export class ChatOrchestrator {
   private llmAdapter: LLMAdapter | null = null;
   private automationService: AutomationProposalService;
   private sceneLearningService: SceneLearningService;
+  private options: ChatOrchestratorOptions;
+  private cachedSystemPrompt: string | null = null;
+  private cachedAt: number = 0;
 
-  constructor(switchBotClient: SwitchBotClient, llmAdapter?: LLMAdapter) {
+  constructor(
+    switchBotClient: SwitchBotClient,
+    llmAdapter?: LLMAdapter,
+    options?: ChatOrchestratorOptions,
+  ) {
     this.switchBotClient = switchBotClient;
     this.llmAdapter = llmAdapter || null;
+    this.options = options ?? {};
     this.automationService = new AutomationProposalService(switchBotClient);
     this.sceneLearningService = new SceneLearningService(switchBotClient);
   }
@@ -67,7 +86,7 @@ export class ChatOrchestrator {
    */
   async processToolCall(toolCall: ToolCall): Promise<ToolResponse> {
     const startTime = Date.now();
-    
+
     try {
       // 引数のパース
       let parsedArgs: any;
@@ -77,46 +96,48 @@ export class ChatOrchestrator {
         return createToolResponse(
           toolCall.function.name,
           null,
-          'error',
-          `Invalid JSON arguments: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          Date.now() - startTime
+          "error",
+          `Invalid JSON arguments: ${error instanceof Error ? error.message : "Unknown error"}`,
+          Date.now() - startTime,
         );
       }
 
       // ツール呼び出しの妥当性検証
       const validation = validateToolCall({
         name: toolCall.function.name,
-        arguments: parsedArgs
+        arguments: parsedArgs,
       });
 
       if (!validation.isValid) {
         return createToolResponse(
           toolCall.function.name,
           null,
-          'error',
-          validation.errors.join(', '),
-          Date.now() - startTime
+          "error",
+          validation.errors.join(", "),
+          Date.now() - startTime,
         );
       }
 
       // ツール実行
-      const result = await this.executeToolCall(toolCall.function.name, parsedArgs);
-      
+      const result = await this.executeToolCall(
+        toolCall.function.name,
+        parsedArgs,
+      );
+
       return createToolResponse(
         toolCall.function.name,
         result,
-        'success',
+        "success",
         undefined,
-        Date.now() - startTime
+        Date.now() - startTime,
       );
-
     } catch (error) {
       return createToolResponse(
         toolCall.function.name,
         null,
-        'error',
-        error instanceof Error ? error.message : 'Unknown error occurred',
-        Date.now() - startTime
+        "error",
+        error instanceof Error ? error.message : "Unknown error occurred",
+        Date.now() - startTime,
       );
     }
   }
@@ -136,7 +157,7 @@ export class ChatOrchestrator {
         return await this.switchBotClient.sendCommand(
           args.deviceId,
           args.command,
-          args.parameter
+          args.parameter,
         );
 
       case HARMONY_TOOLS.GET_SCENES:
@@ -151,53 +172,62 @@ export class ChatOrchestrator {
   }
 
   /**
+   * SwitchBot API からデバイス情報を取得し、動的にシステムメッセージを生成する。
+   * 結果は設定可能な TTL でキャッシュされ、API コールを最小化する。
+   */
+  async generateSystemMessage(): Promise<{ role: "system"; content: string }> {
+    const ttl = this.options.promptCacheTtlMs ?? DEFAULT_PROMPT_CACHE_TTL_MS;
+
+    if (this.cachedSystemPrompt && Date.now() - this.cachedAt < ttl) {
+      return { role: "system" as const, content: this.cachedSystemPrompt };
+    }
+
+    try {
+      const apiResponse = await this.switchBotClient.getDevices();
+      const devices = formatDeviceInfo(
+        apiResponse,
+        this.options.restrictedDeviceIds ?? [],
+      );
+      const prompt = generateSystemPrompt(devices, this.options);
+      this.cachedSystemPrompt = prompt;
+      this.cachedAt = Date.now();
+      return { role: "system" as const, content: prompt };
+    } catch (_error) {
+      // TODO: pino ロガーをオーケストレータースコープに導入後、ここでエラーを記録する
+      return { role: "system" as const, content: FALLBACK_SYSTEM_PROMPT };
+    }
+  }
+
+  /**
    * チャットメッセージを処理し、必要に応じてツール呼び出しを実行
    */
   async processChat(
-    messages: ChatMessage[], 
-    enableTools: boolean = false
+    messages: ChatMessage[],
+    enableTools: boolean = false,
   ): Promise<ChatProcessResult> {
     const toolResults: ToolResponse[] = [];
 
-    // LLMアダプターが利用可能な場合は実際のLLMを使用
     if (this.llmAdapter) {
       try {
-        // システムメッセージを追加してデバイス情報を提供
-        const systemMessage = {
-          role: 'system' as const,
-          content: `あなたはスマートホーム制御アシスタントです。以下のデバイスが利用可能です：
+        const systemMessage = await this.generateSystemMessage();
 
-**利用可能なデバイス:**
-- ハブミニ (ID: E1750C44657C) - Hub Mini
-- 温湿度計 (ID: F66854E650BE) - MeterPlus - 温度・湿度測定
-- アップル (ID: 02-202208281754-46662932) - TVリモート (操作禁止)
-- エアコン (ID: 02-202212241621-96856893) - エアコンリモート (操作禁止)
-
-**重要な指示:**
-1. エアコンとテレビ（アップル）の操作は絶対に行わないでください
-2. 温湿度計のデバッグのみ実行してください
-3. デバイスIDがわかっている場合、get_devicesを呼ぶ必要はありません
-4. 温湿度計の状態確認は get_device_status (deviceId: F66854E650BE) を使用
-5. 明確にデバイス操作を求められた場合のみツールを使用してください
-6. ツール実行後は、取得した結果を分かりやすく自然言語で説明してください
-7. 温湿度計の結果では、温度・湿度・バッテリー状態と快適度を説明してください`
-        };
-
-        const messagesWithSystem = [systemMessage, ...messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }))];
+        const messagesWithSystem = [
+          systemMessage,
+          ...messages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+        ];
 
         const llmRequest: LLMRequest = {
           messages: messagesWithSystem,
           tools: enableTools ? harmonyToolsSchema.tools : undefined,
           temperature: 0.7,
-          max_tokens: 1000
+          max_tokens: 1000,
         };
 
         const llmResponse = await this.llmAdapter.chat(llmRequest);
-        
-        // ツール呼び出しの処理
+
         if (llmResponse.tool_calls && llmResponse.tool_calls.length > 0) {
           for (const toolCall of llmResponse.tool_calls) {
             const toolResult = await this.processToolCall(toolCall);
@@ -206,24 +236,22 @@ export class ChatOrchestrator {
         }
 
         const response: ChatResponse = {
-          role: 'assistant',
+          role: "assistant",
           content: llmResponse.content,
-          tool_calls: llmResponse.tool_calls
+          tool_calls: llmResponse.tool_calls,
         };
 
         return {
           response,
-          toolResults
+          toolResults,
         };
-
       } catch (error) {
-        console.error('LLM処理エラー:', error);
-        // フォールバック: デモモード
+        // eslint-disable-next-line no-console -- pino logger not available in orchestrator scope; to be replaced in logging task
+        console.error("LLM処理エラー:", error);
         return this.processChatDemo(messages, enableTools);
       }
     }
 
-    // LLMアダプターが利用できない場合はデモモード
     return this.processChatDemo(messages, enableTools);
   }
 
@@ -231,15 +259,15 @@ export class ChatOrchestrator {
    * デモモードでのチャット処理
    */
   private async processChatDemo(
-    messages: ChatMessage[], 
-    enableTools: boolean = false
+    messages: ChatMessage[],
+    enableTools: boolean = false,
   ): Promise<ChatProcessResult> {
     const toolResults: ToolResponse[] = [];
 
     if (enableTools && this.shouldUseTool(messages)) {
       const lastMessage = messages[messages.length - 1];
       const toolCall = this.generateMockToolCall(lastMessage.content);
-      
+
       if (toolCall) {
         const toolResult = await this.processToolCall(toolCall);
         toolResults.push(toolResult);
@@ -247,13 +275,13 @@ export class ChatOrchestrator {
     }
 
     const response: ChatResponse = {
-      role: 'assistant',
-      content: this.generateMockResponse(messages, toolResults)
+      role: "assistant",
+      content: this.generateMockResponse(messages, toolResults),
     };
 
     return {
       response,
-      toolResults
+      toolResults,
     };
   }
 
@@ -263,13 +291,15 @@ export class ChatOrchestrator {
   private shouldUseTool(messages: ChatMessage[]): boolean {
     const lastMessage = messages[messages.length - 1];
     const content = lastMessage.content.toLowerCase();
-    
-    return content.includes('デバイス') || 
-           content.includes('一覧') || 
-           content.includes('状態') ||
-           content.includes('つけて') ||
-           content.includes('消して') ||
-           content.includes('シーン');
+
+    return (
+      content.includes("デバイス") ||
+      content.includes("一覧") ||
+      content.includes("状態") ||
+      content.includes("つけて") ||
+      content.includes("消して") ||
+      content.includes("シーン")
+    );
   }
 
   /**
@@ -277,29 +307,29 @@ export class ChatOrchestrator {
    */
   private generateMockToolCall(content: string): ToolCall | null {
     const lowerContent = content.toLowerCase();
-    
-    if (lowerContent.includes('デバイス') || lowerContent.includes('一覧')) {
+
+    if (lowerContent.includes("デバイス") || lowerContent.includes("一覧")) {
       return {
         id: `call-${Date.now()}`,
-        type: 'function',
+        type: "function",
         function: {
-          name: 'get_devices',
-          arguments: '{}'
-        }
+          name: "get_devices",
+          arguments: "{}",
+        },
       };
     }
-    
-    if (lowerContent.includes('つけて') || lowerContent.includes('オン')) {
+
+    if (lowerContent.includes("つけて") || lowerContent.includes("オン")) {
       return {
         id: `call-${Date.now()}`,
-        type: 'function',
+        type: "function",
         function: {
-          name: 'send_command',
+          name: "send_command",
           arguments: JSON.stringify({
-            deviceId: 'demo-device-1',
-            command: 'turnOn'
-          })
-        }
+            deviceId: "demo-device-1",
+            command: "turnOn",
+          }),
+        },
       };
     }
 
@@ -309,25 +339,28 @@ export class ChatOrchestrator {
   /**
    * モック応答を生成（デモ用）
    */
-  private generateMockResponse(messages: ChatMessage[], toolResults: ToolResponse[]): string {
+  private generateMockResponse(
+    messages: ChatMessage[],
+    toolResults: ToolResponse[],
+  ): string {
     if (toolResults.length === 0) {
-      return 'デモモードです。「デバイス一覧を教えて」「エアコンをつけて」などと話しかけてツール機能をお試しください。';
+      return "デモモードです。「デバイス一覧を教えて」「エアコンをつけて」などと話しかけてツール機能をお試しください。";
     }
 
     const lastResult = toolResults[toolResults.length - 1];
-    
-    if (lastResult.tool_name === 'get_devices') {
-      if (lastResult.status === 'success') {
+
+    if (lastResult.tool_name === "get_devices") {
+      if (lastResult.status === "success") {
         const deviceCount = lastResult.result?.body?.deviceList?.length || 0;
         return `デバイス一覧を取得しました。現在${deviceCount}個のデバイスが利用可能です。`;
       } else {
         return `デバイス一覧の取得中にエラーが発生しました: ${lastResult.error_message}`;
       }
     }
-    
-    if (lastResult.tool_name === 'send_command') {
-      if (lastResult.status === 'success') {
-        return 'デバイスコマンドを実行しました。操作が完了しています。';
+
+    if (lastResult.tool_name === "send_command") {
+      if (lastResult.status === "success") {
+        return "デバイスコマンドを実行しました。操作が完了しています。";
       } else {
         return `デバイス操作中にエラーが発生しました: ${lastResult.error_message}`;
       }
