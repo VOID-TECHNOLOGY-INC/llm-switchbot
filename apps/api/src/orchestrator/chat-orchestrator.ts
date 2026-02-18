@@ -6,7 +6,6 @@ import {
   HARMONY_TOOLS,
   type HarmonyToolsSchema,
   type ToolResponse,
-  LLMFactory,
   LLMAdapter,
   LLMRequest,
 } from "@llm-switchbot/harmony-tools";
@@ -194,6 +193,7 @@ export class ChatOrchestrator {
       this.cachedAt = Date.now();
       return { role: "system" as const, content: prompt };
     } catch (_error) {
+      // TODO: pino ロガーをオーケストレータースコープに導入後、ここでエラーを記録する
       return { role: "system" as const, content: FALLBACK_SYSTEM_PROMPT };
     }
   }
