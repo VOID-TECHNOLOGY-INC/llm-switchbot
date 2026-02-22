@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ChatInterface } from '@/components/ChatInterface'
 import { DeviceCard } from '@/components/DeviceCard'
 import { WorkflowCreator } from '@/components/WorkflowCreator'
@@ -74,13 +74,15 @@ export default function Home() {
   const [devicesLoading, setDevicesLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'chat' | 'workflow'>('chat')
 
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
   // デバイス一覧を取得する関数
-  const fetchDevices = async () => {
+  const fetchDevices = useCallback(async () => {
     try {
       setDevicesLoading(true)
       console.log('🔄 デバイス取得開始...')
       
-      const response = await fetch('http://localhost:3001/api/switchbot/devices')
+      const response = await fetch(`${API_BASE_URL}/api/switchbot/devices`)
       console.log('📡 API レスポンス:', response.status, response.ok)
       
       if (!response.ok) {
@@ -146,7 +148,7 @@ export default function Home() {
       setDevicesLoading(false)
       console.log('🏁 fetchDevices 完了')
     }
-  }
+  }, [API_BASE_URL])
 
   // デバイスタイプと名前に基づいて部屋を推定
   const getDeviceRoom = (deviceType: string, deviceName: string): string => {
@@ -222,10 +224,58 @@ export default function Home() {
     }
   }
 
-  // コンポーネントマウント時にデバイス一覧を取得
+  // コンポーネントマウント時にデバイス一覧を取得し、SSE接続を開始
   useEffect(() => {
     fetchDevices()
-  }, [])
+
+    // SSE接続の設定
+    console.log('🔌 SSE 接続開始...')
+    const eventSource = new EventSource(`${API_BASE_URL}/api/events`)
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        console.log('📨 SSE メッセージ受信:', data)
+
+        if (data.type === 'connection') {
+          console.log('✅ SSE 接続確立:', data.clientId)
+        } else if (data.type === 'webhook_event') {
+          const { payload } = data
+          console.log('🔔 Webhook イベント受信:', payload)
+
+          // チャットに通知メッセージを追加
+          const notificationMessage: ChatMessage = {
+            role: 'assistant',
+            content: `🔔 【リアルタイム通知】デバイス (${payload.deviceType}) でイベントが発生しました: ${payload.eventType}`,
+            toolResults: [{
+              tool_name: 'webhook_notification',
+              status: 'info',
+              result: payload,
+              timestamp: new Date().toISOString()
+            }]
+          }
+          setMessages(prev => [...prev, notificationMessage])
+
+          // センサーデータなどの場合はデバイス情報を更新
+          if (payload.eventType === 'changeReport') {
+            fetchDevices() // 再取得して最新状態にする（最適化の余地あり）
+          }
+        }
+      } catch (error) {
+        console.error('❌ SSE メッセージパースエラー:', error)
+      }
+    }
+
+    eventSource.onerror = (error) => {
+      console.error('❌ SSE 接続エラー:', error)
+      eventSource.close()
+    }
+
+    return () => {
+      console.log('🔌 SSE 接続終了')
+      eventSource.close()
+    }
+  }, [API_BASE_URL, fetchDevices]) // fetchDevicesとAPI_BASE_URLを依存関係に追加
 
   const handleSendMessage = async (message: string) => {
     // ユーザーメッセージを追加
@@ -245,7 +295,7 @@ export default function Home() {
       }
       console.log('📤 チャットリクエスト:', requestBody)
       
-      const response = await fetch('http://localhost:3001/api/chat', {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
@@ -290,7 +340,7 @@ export default function Home() {
     
     try {
       // 実際のAPI呼び出し
-              const response = await fetch('http://localhost:3001/api/switchbot/command', {
+      const response = await fetch(`${API_BASE_URL}/api/switchbot/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId, command, parameter })

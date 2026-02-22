@@ -370,6 +370,8 @@ POST /api/scenes/learn/candidates          // シーン候補生成
 - [ ] ESLint 設定の完全修正（API アプリ）
 - [ ] Web テストの修正（DeviceCard パラメータ期待値）
 - [ ] Web typecheck の修正（Jest/DOM 型定義）
+- [x] リアルタイム通信（SSE）のバックエンド実装（SSE ルート、NotificationService、Webhook 連携）
+- [ ] E2E テストの拡充（SSE 疎通、自動化ワークフロー、シーン学習）
 - [ ] ログ/メトリクス/ダッシュボード（最小）
 - [ ] 操作監査ログの実装
 
@@ -377,6 +379,26 @@ POST /api/scenes/learn/candidates          // シーン候補生成
 
 - [ ] デモシナリオ・README・動画
 
-### 18. 参照リンク
+### 18. E2E テスト拡張計画（新規追加）
+
+実装済みの機能を網羅するため、以下の E2E シナリオを追加する。
+
+#### 18.1 SSE リアルタイムイベント
+- **シナリオ**: Webhook 受信が SSE クライアントに即時配信されることを確認
+- **検証項目**: `/api/events` 接続維持、`/api/webhooks/switchbot` への POST、SSE クライアントでのイベント受信
+
+#### 18.2 自動化ワークフロー・ライフサイクル
+- **シナリオ**: 自然言語からのルール作成・保存・実行・履歴確認の全工程を確認
+- **検証項目**: `/workflow/parse` (LLM/Fallback) -> `/workflow/save` -> `/workflow/rules` (一覧) -> `/workflow/rules/:id/execute` -> `/workflow/rules/:id/history`
+
+#### 18.3 シーン学習統合
+- **シナリオ**: 連続した操作記録からシーン候補が生成されることを確認
+- **検証項目**: `/scenes/record` (複数回) -> `/scenes/patterns` -> `/scenes/candidates` (信頼度付き候補)
+
+#### 18.4 セキュリティ・異常系
+- **シナリオ**: 不正な署名や無効なパラメータの拒絶を確認
+- **検証項目**: Webhook 署名検証失敗 (401)、不正なツールパラメータ (400)、存在しないデバイスへの操作
+
+### 19. 参照リンク
 
 - `doc/spec.md` を参照。
