@@ -81,9 +81,33 @@ const webhooksRoutes: FastifyPluginAsync = async function (fastify) {
         timestamp: new Date().toISOString()
       }, 'Received SwitchBot webhook event');
       
-      // TODO: イベントの永続化（データベース保存）
-      // TODO: リアルタイム通知（WebSocket/SSE でフロントエンドに送信）
-      // TODO: 自動化ルールの評価（条件マッチング → アクション実行）
+      // リアルタイム通知（SSE でフロントエンドに送信）
+      fastify.notificationService.broadcast({
+        type: 'webhook_event',
+        payload: webhookEvent,
+        receivedAt: new Date().toISOString()
+      }, 'switchbot-event');
+
+      // 自動化ルールの評価（条件マッチング → アクション実行）
+      try {
+        const rules = fastify.automationSchedulerService.getRules();
+        for (const rule of rules) {
+          if (!rule.isEnabled) continue;
+          
+          // 該当デバイスに関連する条件があるかチェック
+          const hasRelevantCondition = rule.conditions.some(c => c.deviceId === webhookEvent.deviceMac);
+          
+          if (hasRelevantCondition) {
+            fastify.log.info({ ruleId: rule.id, deviceId: webhookEvent.deviceMac }, 'Evaluating automation rule due to webhook event');
+            // 非同期で実行（レスポンスを待たせない）
+            fastify.automationSchedulerService.executeRuleIfConditionsMet(rule).catch(err => {
+              fastify.log.error({ err, ruleId: rule.id }, 'Error executing automation rule from webhook');
+            });
+          }
+        }
+      } catch (automationError) {
+        fastify.log.error(automationError, 'Failed to evaluate automation rules');
+      }
       
       // 成功レスポンス
       return { statusCode: 100, message: 'Webhook processed successfully' };
@@ -104,4 +128,4 @@ const webhooksRoutes: FastifyPluginAsync = async function (fastify) {
   });
 };
 
-module.exports = webhooksRoutes;
+export default webhooksRoutes;

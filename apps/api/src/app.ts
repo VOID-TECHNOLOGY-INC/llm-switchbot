@@ -1,6 +1,9 @@
 import Fastify, { FastifyInstance } from "fastify";
 import { SwitchBotClient } from "@llm-switchbot/switchbot-adapter";
 import { ChatOrchestrator } from "./orchestrator/chat-orchestrator";
+import { NotificationService } from "./services/notification";
+import { ConditionEvaluatorService } from "./services/condition-evaluator";
+import { AutomationSchedulerService } from "./services/automation-scheduler";
 import cors from "@fastify/cors";
 import env from "@fastify/env";
 import { LLMFactory } from "@llm-switchbot/harmony-tools";
@@ -15,6 +18,9 @@ declare module "fastify" {
   interface FastifyInstance {
     switchBotClient: SwitchBotClient;
     chatOrchestrator: ChatOrchestrator;
+    notificationService: NotificationService;
+    conditionEvaluatorService: ConditionEvaluatorService;
+    automationSchedulerService: AutomationSchedulerService;
     config: {
       SWITCHBOT_TOKEN: string;
       SWITCHBOT_SECRET: string;
@@ -88,6 +94,18 @@ export async function build(opts = {}) {
     process.env.SWITCHBOT_SECRET || "demo-secret",
   );
 
+  const notificationService = new NotificationService();
+  const conditionEvaluatorService = new ConditionEvaluatorService(switchBotClient);
+  const automationSchedulerService = new AutomationSchedulerService(switchBotClient, conditionEvaluatorService);
+
+  // Start SSE Heartbeat
+  notificationService.startHeartbeat();
+
+  // Add cleanup hook for SSE heartbeat
+  fastify.addHook("onClose", async () => {
+    notificationService.stopHeartbeat();
+  });
+
   // Initialize LLM adapter
   let llmAdapter = null;
   try {
@@ -133,14 +151,18 @@ export async function build(opts = {}) {
   // Add services to fastify instance (before ready)
   fastify.decorate("switchBotClient", switchBotClient);
   fastify.decorate("chatOrchestrator", chatOrchestrator);
+  fastify.decorate("notificationService", notificationService);
+  fastify.decorate("conditionEvaluatorService", conditionEvaluatorService);
+  fastify.decorate("automationSchedulerService", automationSchedulerService);
 
   // Register route plugins (before ready)
-  fastify.register(require("./routes/switchbot"), { prefix: "/api/switchbot" });
-  fastify.register(require("./routes/chat"), { prefix: "/api" });
-  fastify.register(require("./routes/webhooks"), { prefix: "/api/webhooks" });
-  fastify.register(require("./routes/automation"), { prefix: "/api" });
-  fastify.register(require("./routes/debug"), { prefix: "/api" });
-  fastify.register(require("./routes/automation-workflow"), { prefix: "/api" });
+  fastify.register(require("./routes/switchbot").default || require("./routes/switchbot"), { prefix: "/api/switchbot" });
+  fastify.register(require("./routes/chat").default || require("./routes/chat"), { prefix: "/api" });
+  fastify.register(require("./routes/webhooks").default || require("./routes/webhooks"), { prefix: "/api/webhooks" });
+  fastify.register(require("./routes/automation").default || require("./routes/automation"), { prefix: "/api" });
+  fastify.register(require("./routes/debug").default || require("./routes/debug"), { prefix: "/api" });
+  fastify.register(require("./routes/automation-workflow").default || require("./routes/automation-workflow"), { prefix: "/api" });
+  fastify.register(require("./routes/events").default || require("./routes/events"), { prefix: "/api" });
 
   // Wait for environment variables to be loaded
   await fastify.ready();
