@@ -101,6 +101,11 @@ export async function build(opts = {}) {
   // Start SSE Heartbeat
   notificationService.startHeartbeat();
 
+  // Add cleanup hook for SSE heartbeat
+  fastify.addHook("onClose", async () => {
+    notificationService.stopHeartbeat();
+  });
+
   // Initialize LLM adapter
   let llmAdapter = null;
   try {

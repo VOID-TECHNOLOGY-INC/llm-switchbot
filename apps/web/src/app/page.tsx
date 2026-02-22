@@ -243,22 +243,30 @@ export default function Home() {
           const { payload } = data
           console.log('🔔 Webhook イベント受信:', payload)
 
-          // チャットに通知メッセージを追加
-          const notificationMessage: ChatMessage = {
-            role: 'assistant',
-            content: `🔔 【リアルタイム通知】デバイス (${payload.deviceType}) でイベントが発生しました: ${payload.eventType}`,
-            toolResults: [{
-              tool_name: 'webhook_notification',
-              status: 'info',
-              result: payload,
-              timestamp: new Date().toISOString()
-            }]
-          }
-          setMessages(prev => [...prev, notificationMessage])
+          // デバイス状態をローカルで更新（再取得は行わない）
+          if (payload.deviceMac) {
+             setDevices(prevDevices => prevDevices.map(device => {
+               if (device.id === payload.deviceMac) {
+                 // ペイロードから新しい状態をマージ
+                 // 注意: ペイロードの構造はイベントタイプによって異なるため、
+                 // 必要に応じてマッピングを行う
+                 const newStatus = { ...device.lastStatus };
+                 
+                 // センサーデータや状態の更新
+                 if (payload.temperature !== undefined) newStatus.temperature = payload.temperature;
+                 if (payload.humidity !== undefined) newStatus.humidity = payload.humidity;
+                 if (payload.power !== undefined) newStatus.power = payload.power;
+                 if (payload.doorState !== undefined) newStatus.doorState = payload.doorState;
+                 if (payload.detectionState !== undefined) newStatus.detectionState = payload.detectionState;
 
-          // センサーデータなどの場合はデバイス情報を更新
-          if (payload.eventType === 'changeReport') {
-            fetchDevices() // 再取得して最新状態にする（最適化の余地あり）
+                 return {
+                   ...device,
+                   lastStatus: newStatus,
+                   updatedAt: new Date()
+                 };
+               }
+               return device;
+             }));
           }
         }
       } catch (error) {

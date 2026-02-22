@@ -61,12 +61,18 @@ export class NotificationService {
     return this.clients.size;
   }
 
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+
   /**
    * ハートビート（キープアライブ）を開始する
    * @param intervalMs インターバル（ミリ秒）
    */
-  startHeartbeat(intervalMs: number = 30000): NodeJS.Timeout {
-    return setInterval(() => {
+  startHeartbeat(intervalMs: number = 30000): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+
+    this.heartbeatInterval = setInterval(() => {
       this.clients.forEach((reply, clientId) => {
         try {
           reply.raw.write(': keep-alive\n\n');
@@ -76,5 +82,15 @@ export class NotificationService {
         }
       });
     }, intervalMs);
+  }
+
+  /**
+   * ハートビートを停止する
+   */
+  stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
   }
 }

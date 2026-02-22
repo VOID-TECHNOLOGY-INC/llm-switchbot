@@ -8,7 +8,6 @@ const eventsRoutes: FastifyPluginAsync = async function (fastify) {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*', // 開発環境でのCORS対応
     });
 
     // クライアントを登録
